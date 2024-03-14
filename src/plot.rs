@@ -61,7 +61,8 @@ impl SaveFigOptions {
         match self.transparent {
             true => write!(&mut self.buffer, "transparent=True,"),
             false => write!(&mut self.buffer, "transparent=False,"),
-        }.unwrap();
+        }
+        .unwrap();
         match self.dpi {
             None => write!(&mut self.buffer, "dpi='figure',"),
             Some(dpi) => write!(&mut self.buffer, "dpi={},", dpi),
@@ -188,7 +189,7 @@ impl Plot {
     /// # Note
     ///
     /// Call `set_show_errors` to configure how the errors (if any) are printed.
-    pub fn save_wiht_options<S>(&self, figure_path: &S, options: SaveFigOptions) -> Result<(), StrError>
+    pub fn save_wiht_options<S>(&self, figure_path: &S, options: &SaveFigOptions) -> Result<(), StrError>
     where
         S: AsRef<OsStr> + ?Sized,
     {
@@ -802,22 +803,23 @@ impl Plot {
     }
 
     /// Run python
-    fn run<S>(&self, figure_path: &S, options: Option<SaveFigOptions>, show: bool) -> Result<(), StrError>
+    fn run<S>(&self, figure_path: &S, options: Option<&SaveFigOptions>, show: bool) -> Result<(), StrError>
     where
         S: AsRef<OsStr> + ?Sized,
     {
         // update commands
         let fig_path = Path::new(figure_path);
-        let svg_options = options.unwrap_or_default();
+        let empty = String::new();
+        let svg_options = options.and_then(|f| Some(f.get_buffer())).unwrap_or(&empty);
         let txt = if show {
             format!(
                 "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS,{})\nplt.show()\n",
-                svg_options.get_buffer()
+                svg_options
             )
         } else {
             format!(
                 "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS,{})\n",
-                svg_options.get_buffer()
+                svg_options
             )
         };
         let commands = format!("{}\nfn=r'{}'\n{}", self.buffer, fig_path.to_string_lossy(), txt);

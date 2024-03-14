@@ -117,7 +117,7 @@ fn test_plot_with_options() -> Result<(), StrError> {
     // save figure
     let path = Path::new(OUT_DIR).join("integ_plot_transparent.svg");
     plot.set_figure_size_points(250.0, 250.0 * 0.75);
-    plot.save_wiht_options(&path, options)?;
+    plot.save_wiht_options(&path, &options)?;
 
     // check number of lines
     let file = File::open(path).map_err(|_| "cannot open file")?;
