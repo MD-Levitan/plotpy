@@ -1,4 +1,4 @@
-use plotpy::{linspace, Curve, Plot, StrError, SuperTitleParams};
+use plotpy::{linspace, Curve, Plot, SaveFigOptions, StrError, SuperTitleParams};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -56,6 +56,68 @@ fn test_plot() -> Result<(), StrError> {
     let path = Path::new(OUT_DIR).join("integ_plot.svg");
     plot.set_figure_size_points(250.0, 250.0 * 0.75);
     plot.save(&path)?;
+
+    // check number of lines
+    let file = File::open(path).map_err(|_| "cannot open file")?;
+    let buffered = BufReader::new(file);
+    let lines_iter = buffered.lines();
+    assert!(lines_iter.count() > 900);
+    Ok(())
+}
+
+#[test]
+fn test_plot_with_options() -> Result<(), StrError> {
+    // curve object and options
+    let mut curve = Curve::new();
+
+    // draw curve
+    let x = &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
+    let y = &[1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 3.5, 3.5, 3.5, 3.5];
+    curve.draw(x, y);
+
+    let mut options = SaveFigOptions::new();
+    options.set_transparent(true).build();
+
+    // configure plot
+    let mut plot = Plot::new();
+    plot.set_subplot(2, 2, 1)
+        .set_horizontal_gap(0.1)
+        .set_vertical_gap(0.2)
+        .set_gaps(0.3, 0.4)
+        .set_equal_axes(true)
+        .set_hide_axes(false)
+        .set_range(-1.0, 1.0, -1.0, 1.0)
+        .set_range_from_vec(&[0.0, 1.0, 0.0, 1.0])
+        .set_xmin(0.0)
+        .set_xmax(1.0)
+        .set_ymin(0.0)
+        .set_ymax(1.0)
+        .set_xrange(0.0, 1.0)
+        .set_yrange(0.0, 1.0)
+        .set_num_ticks_x(0)
+        .set_num_ticks_x(8)
+        .set_num_ticks_y(0)
+        .set_num_ticks_y(5)
+        .set_label_x("x-label")
+        .set_label_y("y-label")
+        .set_labels("x", "y")
+        .clear_current_axes();
+    plot.clear_current_figure();
+    plot.set_title("my plot")
+        .set_frame_borders(false)
+        .set_frame_borders(true)
+        .set_frame_borders(false)
+        .set_ticks_x(1.5, 0.5, "%.2f")
+        .set_ticks_y(0.5, 0.1, "%g");
+    plot.grid_and_labels("x", "y");
+
+    // add curve to plot
+    plot.add(&curve);
+
+    // save figure
+    let path = Path::new(OUT_DIR).join("integ_plot_transparent.svg");
+    plot.set_figure_size_points(250.0, 250.0 * 0.75);
+    plot.save_wiht_options(&path, options)?;
 
     // check number of lines
     let file = File::open(path).map_err(|_| "cannot open file")?;

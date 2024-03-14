@@ -1,4 +1,5 @@
 use super::{call_python3, Legend, StrError, SuperTitleParams};
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fmt::Write;
 use std::fs::File;
@@ -12,6 +13,80 @@ pub trait GraphMaker {
 
     /// Clear the text buffer with Python commands
     fn clear_buffer(&mut self);
+}
+
+/// 'savefig' options: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html#matplotlib.pyplot.savefig
+#[derive(Debug, Default)]
+pub struct SaveFigOptions {
+    transparent: bool, // Transparent
+    dpi: Option<f64>,  // The resolution in dots per inch. If None, use the figure's dpi value.
+    format: String,    // The file format
+    metadata: String,  // Metadata as Python dict()
+    //TODO: add others
+
+    // buffer
+    buffer: String,
+}
+
+impl SaveFigOptions {
+    pub fn new() -> Self {
+        Self {
+            transparent: false,
+            dpi: None,
+            format: String::new(),
+            metadata: String::new(),
+            buffer: String::new(),
+        }
+    }
+
+    pub fn set_transparent(&mut self, transparent: bool) -> &mut Self {
+        self.transparent = transparent;
+        self
+    }
+
+    pub fn set_dpi(&mut self, dpi: f64) -> &mut Self {
+        self.dpi = Some(dpi);
+        self
+    }
+    pub fn set_format(&mut self, format: &str) -> &mut Self {
+        self.format = String::from(format);
+        self
+    }
+    pub fn set_metadata(&mut self, metadata: &str) -> &mut Self {
+        self.metadata = String::from(metadata);
+        self
+    }
+
+    pub fn build(&mut self) {
+        match self.transparent {
+            true => write!(&mut self.buffer, "transparent=True,"),
+            false => write!(&mut self.buffer, "transparent=False,"),
+        }.unwrap();
+        match self.dpi {
+            None => write!(&mut self.buffer, "dpi='figure',"),
+            Some(dpi) => write!(&mut self.buffer, "dpi={},", dpi),
+        }
+        .unwrap();
+        match self.format.is_empty() {
+            true => write!(&mut self.buffer, "format=None,"),
+            false => write!(&mut self.buffer, "format={},", self.format),
+        }
+        .unwrap();
+        match self.metadata.is_empty() {
+            true => write!(&mut self.buffer, "metadata=None,"),
+            false => write!(&mut self.buffer, "metadata={},", self.metadata),
+        }
+        .unwrap();
+    }
+}
+
+impl GraphMaker for SaveFigOptions {
+    fn get_buffer<'a>(&'a self) -> &'a String {
+        &self.buffer
+    }
+    fn clear_buffer(&mut self) {
+        self.buffer.clear();
+    }
 }
 
 /// Driver structure that calls Python
@@ -103,6 +178,23 @@ impl Plot {
         self
     }
 
+    /// Calls python3 and saves the python script and figure with options
+    ///
+    /// # Input
+    ///
+    /// * `figure_path` -- may be a String, &str, or Path
+    /// * `options` -- savesvg options.
+    ///
+    /// # Note
+    ///
+    /// Call `set_show_errors` to configure how the errors (if any) are printed.
+    pub fn save_wiht_options<S>(&self, figure_path: &S, options: SaveFigOptions) -> Result<(), StrError>
+    where
+        S: AsRef<OsStr> + ?Sized,
+    {
+        self.run(figure_path, Some(options), false)
+    }
+
     /// Calls python3 and saves the python script and figure
     ///
     /// # Input
@@ -116,7 +208,7 @@ impl Plot {
     where
         S: AsRef<OsStr> + ?Sized,
     {
-        self.run(figure_path, false)
+        self.run(figure_path, None, false)
     }
 
     /// Calls python3, saves the python script and figure, and show the plot window
@@ -132,7 +224,7 @@ impl Plot {
     where
         S: AsRef<OsStr> + ?Sized,
     {
-        self.run(figure_path, true)
+        self.run(figure_path, None, true)
     }
 
     /// Clears the current axes
@@ -710,16 +802,23 @@ impl Plot {
     }
 
     /// Run python
-    fn run<S>(&self, figure_path: &S, show: bool) -> Result<(), StrError>
+    fn run<S>(&self, figure_path: &S, options: Option<SaveFigOptions>, show: bool) -> Result<(), StrError>
     where
         S: AsRef<OsStr> + ?Sized,
     {
         // update commands
         let fig_path = Path::new(figure_path);
+        let svg_options = options.unwrap_or_default();
         let txt = if show {
-            "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS)\nplt.show()\n"
+            format!(
+                "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS,{})\nplt.show()\n",
+                svg_options.get_buffer()
+            )
         } else {
-            "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS)\n"
+            format!(
+                "plt.savefig(fn,bbox_inches='tight',bbox_extra_artists=EXTRA_ARTISTS,{})\n",
+                svg_options.get_buffer()
+            )
         };
         let commands = format!("{}\nfn=r'{}'\n{}", self.buffer, fig_path.to_string_lossy(), txt);
 
